@@ -1,7 +1,7 @@
 EXEC = hw4_mm_test
 TARGETS = $(EXEC)
 CC := gcc
-override CFLAGS += -O0 -Wall -g
+override CFLAGS += -O3 -Wall
 OBJS = hw4_mm_test.o ./lib/hw_malloc.o
 SUBDIR = ./lib
 GIT_HOOKS := .git/hooks/applied
@@ -9,7 +9,6 @@ GIT_HOOKS := .git/hooks/applied
 all: $(GIT_HOOKS) $(TARGETS)
 
 $(GIT_HOOKS):
-	@.githooks/install-git-hooks
 	@echo
 
 $(EXEC): $(OBJS)

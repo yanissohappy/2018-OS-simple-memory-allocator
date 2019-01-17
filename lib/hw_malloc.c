@@ -1,7 +1,6 @@
 #include "hw_malloc.h"
 #include <assert.h>
 
-//#define M_MMAP_THRESHOLD 32768
 #define ALLOCATED 1
 #define FREE 0
 
@@ -14,7 +13,6 @@ void bin_choose_and_add_in(struct chunk_header *new)
 {
     int bin_index=0;
 
-    //int bytes=new->size_and_flag.cur_chunk_size;
     if(new->size_and_flag.cur_chunk_size<=32)//2^5 between header ~ 2^5
         bin_index=0;
     else if(new->size_and_flag.cur_chunk_size>32 && new->size_and_flag.cur_chunk_size<=64) {
@@ -52,7 +50,6 @@ int best_fit(size_t chunk_size)
 {
     int best_fit_size=0; //get 2^n this n.
 
-    //int bytes=target->size_and_flag.cur_chunk_size;
     if(chunk_size>24 && chunk_size<=32)//2^5 between header ~ 2^5
         best_fit_size=32; // b[0]
     else if(chunk_size>32 && chunk_size<=64) {
@@ -82,7 +79,6 @@ int best_fit(size_t chunk_size)
     return best_fit_size;
 }
 
-//void split(struct chunk_header *target)
 void split(struct chunk_header *target, unsigned int chunk_size)//chunk_size will be the "best fit size".
 {
     int total_power_chunk=0;
@@ -102,15 +98,11 @@ void split(struct chunk_header *target, unsigned int chunk_size)//chunk_size wil
 
     corresponding_chunk_size=chunk_size;
     corresponding_target_size=target->size_and_flag.cur_chunk_size;
-
     remain_needed_cut=total_power_target-total_power_chunk;
-    // printf("remain:%d\n",remain_needed_cut); //test.
 
     if(chunk_size==65536) { // will cut it half.
         struct chunk_header *remain = shift(target, 32768);
-        // printf("Start Address:%p\n",start_addr);
-        // printf("Split target Address:%p\n",target);//for deBUG
-        // printf("Split remain Address:%p\n",remain);//for deBUG
+
         remain->size_and_flag.cur_chunk_size = 32768;
         remain->size_and_flag.allocated_flag = FREE; // not very sure!!!!!!
         remain->size_and_flag.pre_chunk_size = 32768;
@@ -144,12 +136,7 @@ void split(struct chunk_header *target, unsigned int chunk_size)//chunk_size wil
                 target->size_and_flag.cur_chunk_size = target->size_and_flag.cur_chunk_size/2;
                 target->size_and_flag.mmap_flag=0;
                 bin_choose_and_add_in(remain);
-                //printf("Split remain Address:%p\n",remain);//for deBUG
-                //printf("Split Address:%p\n",target); //for deBUG
                 corresponding_chunk_size/=2;
-                //remain_needed_cut--;
-                //printf("Half:%d\n",target->size_and_flag.cur_chunk_size); //test.
-
                 split(target, chunk_size);
             } else {
                 return ;
@@ -193,19 +180,15 @@ struct chunk_header *find_mmap_and_delete(struct chunk_header *address)//will re
 {
     struct chunk_header *original_ptr = address;
     struct chunk_header *ptr = address->prev;
-    // printf("1\n");
+
     while (ptr != original_ptr) {
         if (ptr == address) {
-            // printf("2\n");
             break;
         }
-        // printf("3\n");
         ptr = ptr->prev;
-        // printf("3.5\n");
     }
-    // printf("4\n");
     delete_chunk(ptr);
-    // printf("5\n");
+
     return ptr;
 }
 
@@ -301,16 +284,12 @@ void *hw_malloc(size_t bytes)
         mmap_head->next= mmap_head;
 
         split(total_heap,best_fit(65536));
-        //printf("--------------------\n");//test.
         bin_choose_and_add_in(total_heap);
-        // printf("how big :%d\n",total_heap->size_and_flag.cur_chunk_size);//test. the answer is 32768(right!)
         initialized=1; // and it won't enter again.
     }
 
     if(chunk_size > 32768) { //mmap allocation method //has problem...
-        // mallopt(M_MMAP_THRESHOLD, 32 * 1024);
         struct chunk_header *p = mmap (0, chunk_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-        // printf("hw_malloc mmap address:%p\n",p);//for deBUG Yeah it works!
         p->size_and_flag.cur_chunk_size=chunk_size;
         p->size_and_flag.mmap_flag=1;
         add_mmap_list(mmap_head, p);
@@ -319,24 +298,18 @@ void *hw_malloc(size_t bytes)
 
     } else {//heap allocation method
         for (int i = 0; i < 11; i++) {
-            // fprintf(stdout, "bin=%d\n", i);
             if ((this_is_the_chunk_i_want = find_chunk(i, best_fit_size))) {
-                //printf("You found!!!!in bin[%d]\n",i);//test. YES I really can find it!
-                // printf("this_is_the_chunk_i_want address:%p\n",this_is_the_chunk_i_want);//test.
                 break;
             }
         }
 
         if (!this_is_the_chunk_i_want) {
-            //printf("You found nothing hahahhaa.\n");//test.
             return NULL;
         }
 
         split(this_is_the_chunk_i_want, best_fit_size);//If "this_is_the_chunk_i_want" is too big,split it.
         this_is_the_chunk_i_want->size_and_flag.allocated_flag = ALLOCATED;
         this_is_the_chunk_i_want->size_and_flag.mmap_flag = 0;
-        // printf("this size is :%d\n",this_is_the_chunk_i_want->size_and_flag.cur_chunk_size);
-        //this_is_the_chunk_i_want->size_and_flag.cur_chunk_size = best_fit_size;
 
         return shift(this_is_the_chunk_i_want, sizeof(struct chunk_header));
     }
@@ -346,8 +319,6 @@ void *hw_malloc(size_t bytes)
 
 void merge(struct chunk_header *prev, struct chunk_header *next)
 {
-    // struct chunk_header *next_chunk = next_header(next);
-    // struct chunk_header *previous_chunk = prev_header(prev);
     if(prev->size_and_flag.cur_chunk_size==next->size_and_flag.cur_chunk_size && prev->size_and_flag.cur_chunk_size!=32768 && next->size_and_flag.cur_chunk_size!=32768) {
         delete_chunk(prev);
         delete_chunk(next);
@@ -390,26 +361,13 @@ int is_free(struct chunk_header *chunk)
 
 int hw_free(void *mem)
 {
-    // printf("YES FREE IS doing the address is %p.\n",mem);//test.
-    // printf("start address is %p.\n",get_start_sbrk());//test.
-    // struct chunk_header *mmap_header=(struct chunk_header *)mem;
-    // printf("mmap free!!!\n"); //test.
     struct chunk_header *header = shift(mem, -sizeof(struct chunk_header));
-    // printf("mmap free1!!!\n"); //test.
     if(find_mmap(header)) {
         if(header->size_and_flag.mmap_flag==1) {
-            //  printf("mmap free!!!\n");
-            // if(header->size_and_flag.mmap_flag==1) {
-
-            // printf("mmap free!!!\n"); //test.
             header->size_and_flag.mmap_flag = 0;
-            // printf("mmap free1!!!\n");
-            // printf("size is %d.\n",mmap_header->size_and_flag.cur_chunk_size);//test.
-            // printf("address %lx.\n",mmap_header);//test.
             find_mmap_and_delete(header);
-            // printf("between findmap and munmap\n");
             int r=munmap(header, header->size_and_flag.cur_chunk_size);
-            // printf("mmap free2!!!\n");
+
             if(r==0)
                 return 1;
             else
@@ -418,19 +376,14 @@ int hw_free(void *mem)
         }
     } else if(!find_mmap(header)) {
         if (!is_header(header)) {
-            // printf("Not header.\n"); //test.
-            // printf("header size:%d.\n",header->size_and_flag.cur_chunk_size);
             return 0;
         }
         if(header->size_and_flag.cur_chunk_size<= 32 * 1024) {
             if (!is_header(header)) {
-                // printf("Not header.\n"); //test.
-                // printf("header size:%d.\n",header->size_and_flag.cur_chunk_size);
                 return 0;
             }
 
             if(is_free(header)) {
-                // printf("Not FREE!!!!\n");
                 return 0;
             }
 
@@ -438,7 +391,6 @@ int hw_free(void *mem)
             bin_choose_and_add_in(header);
 
             if (prev_header(header) < header && is_free(prev_header(header))) { //lower address has higher priority to merge
-                //printf("I am here!!!!\n");
                 merge(prev_header(header), header);
             }
             if (next_header(header) > header && is_free(next_header(header))) {
@@ -449,7 +401,6 @@ int hw_free(void *mem)
             return 1;
         }
     }
-    // printf("Not FREE!!!!\n");
     return 0; // if find no any.
 }
 
@@ -478,7 +429,4 @@ void print_mmap()
         printf("0x%012lx--------%u\n", (long unsigned int)ptr, ptr->size_and_flag.cur_chunk_size);
         ptr = ptr->next;
     }
-
-    // if(ptr==mmap_head)
-    // printf("NULL\n");
 }
